@@ -1,14 +1,13 @@
 #define _GNU_SOURCE
 #include <stdio.h>
+#include <sched.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <stdlib.h>
 #include <sys/syscall.h>
 #include <string.h>
-#include <process.h>
-#define show_mes 333 
-#define get_time 334
+#include "process.h"
 int policy, number;
 char policy_name[10];
 char message[200];
@@ -53,24 +52,27 @@ void FIFO(){
 		for(int i = 0; i < number; i++){
 			if(p[i].s_time == now_t){
 				p[i].pid = execute(p[i]);
-				stop(p[i].pid)
+				stop(p[i].pid);
 			}
 		}
 		if(running == -1){
 			for(int i = 0; i < number; i++){
 				if(p[i].e_time == 0) continue;
 				else {
-					running = i;
+					running = i;		
+					keep(p[running].pid, policy);
+#ifdef DEBUG
+					for(int j = 0; j < number; j++)
+						fprintf(stderr, "%d is %d\n", p[j].pid, sched_getscheduler(p[j].pid));
+#endif
 					break;
 				}
 			}
 		}
-		if(running != -1){
-			keep(p[i].pid);
-		}
 		unit_time();
 		if(running != -1){
-			p[i].e_time--;
+			//fprintf(stderr, "%s %ld\n", p[running].name, p[running].e_time);
+			p[running].e_time--;
 		}
 		now_t++;
 	}
@@ -84,8 +86,9 @@ int main(){
 	printf("%s\n", message);	
 	syscall(show_mes, message);
 #endif 
+	fprintf(stderr, "I am on %d\n", sched_getcpu());
 	set_cpu(getpid(), parent);
-
+	keep(getpid(), 0);
 	if(policy == 0){
 		FIFO();
 	}
