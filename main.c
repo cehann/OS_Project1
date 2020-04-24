@@ -1,5 +1,10 @@
 #include <stdio.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/syscall.h>
 #include <string.h>
+#define show_mes 333 
+#define get_time 334
 void unit_time(){
 	volatile unsigned long i; for(i=0;i<1000000UL;i++);
 }
@@ -16,10 +21,11 @@ void get_info(){
 	for(int i = 0; i < number; i++)
 	printf("%s %d %d\n", process_name[i], s_time[i], e_time[i]);
 }
+unsigned long ini_sec, ini_nsec;
 int main(){
-	unsigned long ini_sec, ini_nsec;
-	get_time(ini_sec, ini_nsec);
+	syscall(get_time, &ini_sec, &ini_nsec);
 	sprintf(message, "[Project1] %d %lu.%09lu", 3, ini_sec, ini_nsec);
-	get_info(message);
+	printf("%s\n", message);	
+	syscall(show_mes, message);
 	return 0;
 }
