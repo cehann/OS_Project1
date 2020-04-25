@@ -22,13 +22,13 @@ void get_info(){
 	if(strcmp(policy_name, "RR") == 0) policy = 1;
 	if(strcmp(policy_name, "SJF") == 0) policy = 2;
 	if(strcmp(policy_name, "PSJF") == 0) policy = 3;
-
-#ifdef DEBUG
+/*
 	printf("%d\n", number);
 	for(int i = 0; i < number; i++)
 		printf("%s %ld %ld\n", p[i].name, p[i].s_time, p[i].e_time);
-#endif 
+*/
 }
+
 int cmp(const void* a, const void *b){
 	return ((struct process *)a)->s_time > ((struct process *)b)->s_time;
 }
@@ -97,11 +97,12 @@ void do_task(){
        qsort(p, number, sizeof(struct process), cmp_for_SJF);
     else
 	    qsort(p, number, sizeof(struct process), cmp);
-#ifdef DEBUG
+/*
 	for(int i = 0; i < number; i++)
 		printf("%s %ld %ld\n", p[i].name, p[i].s_time, p[i].e_time);
-#endif
-	int oncore = -1, rr = 0; 
+*/
+
+	int oncore = -1; 
 	while(1){
         update();
         if(shm[3] != 0){
@@ -115,11 +116,12 @@ void do_task(){
                 }
             }
             fs++;
-            printf("%s %d\n", p[death].name, p[death].pid);
+            printf("%s %d\n", p[death].name, shm[3]);
+			fflush(stdout);
             shm[3] = 0;
+            oncore = -1;
             if(fs == number)
                 break;
-            oncore = -1;
         }
         int last = -1;
 		for(int i = 0; i < number; i++){
@@ -157,7 +159,6 @@ void do_task(){
         else {
             if(oncore == -1){
                 oncore = nxt(oncore);
-                fprintf(stderr, "Here %d\n", p[oncore].pid);
                 if(oncore != -1){
                     keep(getpid(), 0, 49);
                     keep(p[oncore].pid, policy, 50);
@@ -169,6 +170,7 @@ void do_task(){
             }
         }
         if(oncore == -1){
+			//fprintf(stderr, "I am running %d\n", shm[0]);
 		    unit_time();
             shm[0]++;
         }
