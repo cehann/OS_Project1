@@ -11,7 +11,7 @@
 int policy, number;
 char policy_name[10];
 char message[200];
-int now_t = 0, finish_cnt;
+int fs;
 struct process p[200];
 void get_info(){
 	scanf("%s", policy_name);
@@ -32,65 +32,154 @@ void get_info(){
 int cmp(const void* a, const void *b){
 	return ((struct process *)a)->s_time > ((struct process *)b)->s_time;
 }
-void FIFO(){
-	qsort(p, number, sizeof(struct process), cmp);
+int cmp_for_SJF(const void *a, const void *b){
+    struct process* _a = (struct process*)a;
+    struct process* _b = (struct process*)b;
+    if(_a->s_time == _b->s_time){
+        return _a->e_time > _b->e_time;
+    }
+    return _a->s_time > _b->s_time;
+}
+int cmp_for_PSJF(const void *a, const void *b){
+    struct process* _a = (struct process*) a;
+    struct process* _b = (struct process*) b;
+    if(_a->e_time == 0)
+        return _a->e_time < _b->e_time;
+    if(_b->e_time == 0)
+        return _b->e_time > _a->e_time;
+    return _a->e_time > _b->e_time;
+}
+int nxt(int pre){
+    int ret = -1;
+	if(policy == 0 || policy == 2 || policy == 3){
+		for(int i = 0; i < number; i++){
+            if(p[i].alive == 1){
+                ret = i;
+                break;
+            }
+		}
+	}
+    else if(policy == 1){
+        if(pre == -1){
+            for(int i = 0; i < number; i++){
+                if(p[i].alive == 1){
+                    ret = i;
+                    break;
+                }
+            }
+        }
+        else{
+            for(int i = 1; i <= number; i++){
+                if(p[(pre+i) % number].alive == 1){
+                    ret = (pre + i) % number;
+                    break;
+                }
+            }
+        }
+    }
+    return ret;
+}
+void update(){
+    if(shm[4] != 0){
+        int id = shm[4];
+        for(int i = 0; i < number; i++){
+            if(p[i].pid == id){
+                p[i].e_time = shm[5];
+                shm[4] = shm[5] = 0;
+                break;
+            }
+        }
+    }
+    return;
+}
+void do_task(){
+    if(policy == 2 || policy == 3)
+       qsort(p, number, sizeof(struct process), cmp_for_SJF);
+    else
+	    qsort(p, number, sizeof(struct process), cmp);
 #ifdef DEBUG
-	//printf("%d\n", number);
 	for(int i = 0; i < number; i++)
 		printf("%s %ld %ld\n", p[i].name, p[i].s_time, p[i].e_time);
 #endif
-	int running = -1; 
+	int oncore = -1, rr = 0; 
 	while(1){
-		if(running != -1 && p[running].e_time == 0){
-			waitpid(p[running].pid, NULL, 0);
-			finish_cnt++;
-			printf("%s %d\n",p[running].name, p[running].pid);
-			running = -1;
-			if(finish_cnt == number) 
-				break;
-		}
+        update();
+        if(shm[3] != 0){
+            waitpid(shm[3], NULL, 0);
+            int death = 0;
+            for(int i = 0; i < number; i++){
+                if(p[i].pid == shm[3]){
+                    p[i].alive = -1;
+                    death = i;
+                    break;
+                }
+            }
+            fs++;
+            printf("%s %d\n", p[death].name, p[death].pid);
+            shm[3] = 0;
+            if(fs == number)
+                break;
+            oncore = -1;
+        }
+        int last = -1;
 		for(int i = 0; i < number; i++){
-			if(p[i].s_time == now_t){
+			if(p[i].alive == 0 && p[i].s_time == shm[0]){
 				p[i].pid = execute(p[i]);
-				stop(p[i].pid);
+                p[i].alive = 1;
+                last = i;
 			}
 		}
-		if(running == -1){
-			for(int i = 0; i < number; i++){
-				if(p[i].e_time == 0) continue;
-				else {
-					running = i;		
-					keep(p[running].pid, policy);
-#ifdef DEBUG
-					for(int j = 0; j < number; j++)
-						fprintf(stderr, "%d is %d\n", p[j].pid, sched_getscheduler(p[j].pid));
-#endif
-					break;
-				}
-			}
-		}
-		unit_time();
-		if(running != -1){
-			//fprintf(stderr, "%s %ld\n", p[running].name, p[running].e_time);
-			p[running].e_time--;
-		}
-		now_t++;
+        update();
+        if(last != -1){
+            if(last != number - 1){
+                shm[1] = p[last + 1].s_time;
+            }
+            else
+                shm[1] = -1;
+            if(policy == 3){
+                qsort(p, last + 1, sizeof(struct process), cmp_for_PSJF);
+                oncore = -1;
+            } 
+        }
+        if(policy == 1){
+            if(oncore == -1){
+                oncore = nxt(oncore);
+            }
+            else if(shm[6] == 1){
+               oncore = nxt(oncore);
+               shm[6] = 0;
+            }
+            if(oncore != -1){
+                keep(getpid(), 0, 49);
+                keep(p[oncore].pid, policy, 50);
+            }
+        }
+        else {
+            if(oncore == -1){
+                oncore = nxt(oncore);
+                fprintf(stderr, "Here %d\n", p[oncore].pid);
+                if(oncore != -1){
+                    keep(getpid(), 0, 49);
+                    keep(p[oncore].pid, policy, 50);
+                }
+            }
+            else{
+                keep(getpid(), 0, 49);
+                keep(p[oncore].pid, policy ,50);
+            }
+        }
+        if(oncore == -1){
+		    unit_time();
+            shm[0]++;
+        }
 	}
 }
-//unsigned long ini_sec, ini_nsec;
 int main(){
 	get_info();
-#ifdef SYSCALL
-	syscall(get_time, &ini_sec, &ini_nsec);
-	sprintf(message, "[Project1] %d %lu.%09lu", 3, ini_sec, ini_nsec);
-	printf("%s\n", message);	
-	syscall(show_mes, message);
-#endif 
-	fprintf(stderr, "I am on %d\n", sched_getcpu());
 	set_cpu(getpid(), parent);
-	keep(getpid(), 0);
-	if(policy == 0){
-		FIFO();
-	}
+	keep(getpid(), 0, 49);
+    shm = create_shared_memory(1024);
+    shm[2] = getpid();
+    do_task();
 	return 0;
 }
