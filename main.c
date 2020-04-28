@@ -9,10 +9,10 @@
 #include <string.h>
 #include "process.h"
 int policy, number;
-char policy_name[10];
+char policy_name[MAXN];
 char message[200];
 int fs;
-struct process p[200];
+struct process p[MAXN];
 void get_info(){
 	scanf("%s", policy_name);
  	scanf("%d", &number);
