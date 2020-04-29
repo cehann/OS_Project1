@@ -31,6 +31,8 @@ int execute(struct process proc){
 	if(pid == 0){
 		char message[200];
 		proc.pid = getpid();
+        keep(getpid(), 0, 1);
+        //stop(getpid());
 		syscall(get_time, &proc.ini_sec, &proc.ini_nsec);
         int tot = 0;
 		while(proc.e_time != 0){
@@ -65,7 +67,8 @@ int execute(struct process proc){
 		exit(0);
 	}
 	set_cpu(pid, parent);
-	stop(pid);
+   // keep(getpid(), 0, 1);
+	//stop(pid);
 	return pid;
 }
 int stop(int pid){

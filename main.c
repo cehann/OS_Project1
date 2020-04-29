@@ -13,6 +13,7 @@ char policy_name[MAXN];
 char message[200];
 int fs;
 struct process p[MAXN];
+int q[MAXN], fr, bk;
 void get_info(){
 	scanf("%s", policy_name);
  	scanf("%d", &number);
@@ -28,7 +29,22 @@ void get_info(){
 		printf("%s %ld %ld\n", p[i].name, p[i].s_time, p[i].e_time);
 */
 }
-
+void push(int x){
+	q[bk] = x;
+    bk = (bk + 1) % MAXN;
+	return;
+}
+int pop(){
+    if(q[fr] == -1){
+        return -1;
+    }
+    else{
+        int x = q[fr];
+        q[fr] = -1;
+        fr = (fr + 1) % MAXN;
+        return x;
+    }
+}
 int cmp(const void* a, const void *b){
 	return ((struct process *)a)->s_time > ((struct process *)b)->s_time;
 }
@@ -126,6 +142,9 @@ void do_task(){
         int last = -1;
 		for(int i = 0; i < number; i++){
 			if(p[i].alive == 0 && p[i].s_time == shm[0]){
+                if(policy == 1){
+                    push(i);
+                }
 				p[i].pid = execute(p[i]);
                 p[i].alive = 1;
                 last = i;
@@ -145,11 +164,12 @@ void do_task(){
         }
         if(policy == 1){
             if(oncore == -1){
-                oncore = nxt(oncore);
+                oncore = pop();
             }
             else if(shm[6] == 1){
-               oncore = nxt(oncore);
-               shm[6] = 0;
+                push(oncore);
+                oncore = pop();
+                shm[6] = 0;
             }
             if(oncore != -1){
                 keep(getpid(), 0, 49);
@@ -182,6 +202,7 @@ int main(){
 	keep(getpid(), 0, 49);
     shm = create_shared_memory(1024);
     shm[2] = getpid();
+    memset(q, -1, sizeof(q));
     do_task();
 	return 0;
 }
